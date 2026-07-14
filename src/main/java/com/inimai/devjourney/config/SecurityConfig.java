@@ -14,7 +14,10 @@ public class SecurityConfig {
             throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/users", "/users/login").permitAll()
+                .anyRequest().authenticated()
+            )
             .httpBasic(Customizer.withDefaults());
         return http.build();
     }

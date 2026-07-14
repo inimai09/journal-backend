@@ -4,6 +4,7 @@ import com.inimai.devjourney.dto.LoginRequest;
 import com.inimai.devjourney.entity.User;
 import com.inimai.devjourney.repository.UserRepository;
 import com.inimai.devjourney.security.JwtUtil;
+import com.inimai.devjourney.dto.LoginResponse;
 
 import java.util.*;
 
@@ -51,14 +52,14 @@ public class UserService {
         return userRepository.save(existingUser);
     }
 
-    public String login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request) {
 
     User user = userRepository
             .findByEmail(request.getEmail())
             .orElse(null);
 
         if (user == null) {
-            return "User not found";
+            return new LoginResponse(null, "User not found");
         }
 
         boolean matches = passwordEncoder.matches(
@@ -67,10 +68,10 @@ public class UserService {
         );
 
         if (!matches) {
-            return "Invalid password";
+            return new LoginResponse(null, "Invalid password");
         }
 
         String token = jwtUtil.generateToken(user.getEmail());
-        return "Login successful. Token: " + token;
+        return new LoginResponse(token, "Login successful");
     }
 }

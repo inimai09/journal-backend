@@ -24,7 +24,7 @@ public class JwtUtil {
         );
     }
     public String generateToken(String email) {
-        return Jwts.builder()
+        return Jwts.builder()//starts token
             .subject(email)
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
@@ -32,11 +32,11 @@ public class JwtUtil {
             .compact();
     }
     public String extractEmail(String token) {
-        return Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
-            .parseSignedClaims(token)
-            .getPayload()
+        return Jwts.parser()//reads token
+            .verifyWith(getSigningKey())//signature
+            .build()//builds final token
+            .parseSignedClaims(token)//check sign if ok then or throw error
+            .getPayload()//the middle part is payload xxxx.yyyy.zzzz
             .getSubject();
     }
 }

@@ -2,6 +2,8 @@ package com.inimai.devjourney.controller;
 
 import java.util.*;
 import com.inimai.devjourney.dto.LoginRequest;
+import com.inimai.devjourney.dto.LoginResponse;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,7 +47,7 @@ public class UserController {
         return userservice.getUserById(id);
     }
     @PostMapping("/login")
-    public String login(@RequestBody LoginRequest request) {
+    public LoginResponse login(@RequestBody LoginRequest request) {
         return userservice.login(request);
-    }
+    } 
 }

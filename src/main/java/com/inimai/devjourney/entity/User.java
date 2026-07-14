@@ -1,6 +1,7 @@
 package com.inimai.devjourney.entity;
 
-import jakarta.persistence.Entity;
+import java.util.List;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -8,10 +9,12 @@ import jakarta.persistence.*;
 public class User {
     
     @Id
+    //generatedvalue is used to automatically generate the primary key value for the entity. The strategy attribute specifies the primary key generation strategy to be used. In this case, GenerationType.IDENTITY is used, which means that the database will automatically generate a unique value for the primary key when a new record is inserted into the table.
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String username;
     private String password;
+    //for email
     @Column(unique = true)
     private String email;
 
@@ -42,5 +45,7 @@ public class User {
     public void setEmail(String email){
         this.email = email;
     }
-
+    
+    @OneToMany(mappedBy = "user")
+    private List<Journal> journals;
 }

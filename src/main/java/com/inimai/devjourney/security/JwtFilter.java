@@ -4,8 +4,11 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.inimai.devjourney.repository.UserRepository;
 
 import java.io.IOException;
 
@@ -13,9 +16,11 @@ import java.io.IOException;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
-    public JwtFilter(JwtUtil jwtUtil) {
+    public JwtFilter(JwtUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -36,6 +41,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             String email = jwtUtil.extractEmail(token);
+            User user = userRepository.findByEmail(email).orElse(null);
 
 
         } catch (Exception e) {
