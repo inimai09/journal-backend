@@ -26,7 +26,6 @@ public class JournalController {
 
     @PostMapping
     public Journal createJournal(@RequestBody Journal journal) {
-        
         return journalService.saveJournal(journal);
     }
     @GetMapping
