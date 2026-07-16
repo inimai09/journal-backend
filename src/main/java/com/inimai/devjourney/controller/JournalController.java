@@ -8,10 +8,13 @@ import com.inimai.devjourney.service.JournalService;
 
 import java.util.List;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PutMapping;
+
 
 
 @RestController
@@ -35,6 +38,14 @@ public class JournalController {
     @GetMapping("/{id}")
     public Journal getJournal(@PathVariable Long id){
         return journalService.getJournalById(id);
+    }
+    @PutMapping("/{id}")
+    public Journal updateJournal(@PathVariable Long id, @RequestBody Journal journal) {
+           return journalService.updateJournal(id, journal);
+    }
+    @DeleteMapping("/{id}")
+    public String deleteJournal(@PathVariable Long id) {
+        return journalService.deleteJournal(id);
     }
     
 }

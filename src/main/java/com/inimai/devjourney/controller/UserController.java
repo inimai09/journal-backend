@@ -47,6 +47,8 @@ public class UserController {
         return userservice.getUserById(id);
     }
     @PostMapping("/login")
+    //LOGINRESPONSE is dto it goes back to frontend, it gets the values the backend gives
+    //and requestbody loginreq is a dto in which the frontend communicates through to backend, it has json values
     public LoginResponse login(@RequestBody LoginRequest request) {
         return userservice.login(request);
     } 

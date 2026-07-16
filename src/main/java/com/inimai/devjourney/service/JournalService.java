@@ -9,17 +9,14 @@ import org.springframework.stereotype.Service;
 import com.inimai.devjourney.entity.Journal;
 import com.inimai.devjourney.entity.User;
 import com.inimai.devjourney.repository.JournalRepository;
-import com.inimai.devjourney.repository.UserRepository;
 
 @Service
 public class JournalService {
 
     private final JournalRepository journalRepository;
-    private final UserRepository userRepository;
 
-    public JournalService(JournalRepository journalRepository, UserRepository userRepository) {
+    public JournalService(JournalRepository journalRepository) {
         this.journalRepository = journalRepository;
-        this.userRepository = userRepository;
     }
 
     public Journal saveJournal(Journal journal) {
@@ -36,9 +33,46 @@ public class JournalService {
    //Authorities (Roles)
    //Authenticated? (true/false)
     public Journal getJournalById(Long id) {
-        return journalRepository.findById(id).orElse(null);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = (User) authentication.getPrincipal();
+        return journalRepository.findByIdAndUser(id, user)
+                .orElse(null);
     }
     public List<Journal> getAllJournals() {
-        return journalRepository.findAll();
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        User user = (User) authentication.getPrincipal();
+
+        return journalRepository.findByUser(user);
+    }
+
+    public Journal updateJournal(Long id, Journal journal) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = (User) authentication.getPrincipal();
+        Journal j = journalRepository.findByIdAndUser(id, user).orElse(null);
+
+        if(j == null){
+            return null;
+        }
+        j.setTitle(journal.getTitle());
+        j.setContent(journal.getContent());
+        return journalRepository.save(j);//exisiting journal obj is updated with new title and content
+    }
+    public String deleteJournal(Long id) {
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    User user = (User) authentication.getPrincipal();
+    Journal j = journalRepository
+            .findByIdAndUser(id, user)
+            .orElse(null);
+
+    if (j == null) {
+        return "Journal not found";
+    }
+    journalRepository.delete(j);
+    return "Journal deleted successfully";
     }
 }
