@@ -2,9 +2,12 @@ package com.inimai.devjourney.service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.inimai.devjourney.dto.LoginRequest;
 import com.inimai.devjourney.entity.User;
+import com.inimai.devjourney.exception.ResourceNotFoundException;
 import com.inimai.devjourney.repository.UserRepository;
 import com.inimai.devjourney.security.JwtUtil;
 import com.inimai.devjourney.dto.LoginResponse;
+import com.inimai.devjourney.dto.RegisterRequest;
+import com.inimai.devjourney.dto.UserResponse;
 
 import java.util.*;
 
@@ -23,33 +26,41 @@ public class UserService {
         this.jwtUtil = jwtUtil;
     }
 
-    public User saveUser(User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+    public UserResponse saveUser(RegisterRequest request) {
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        return mapToResponse(userRepository.save(user));
     }
 
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    public List<UserResponse> getAllUsers() {
+        List<User> users = userRepository.findAll();
+        List<UserResponse> response = new ArrayList<>();
+        for(User user : users) {
+            response.add(mapToResponse(user));
+        }
+        return response;
     }
 
-    public User getUserById(Long id) {
-        return userRepository.findById(id).orElse(null);
+    public UserResponse getUserById(Long id) {
+        User user = userRepository.findById(id)
+        .orElseThrow(() ->
+            new ResourceNotFoundException("User not found"));
+        
+        return mapToResponse(user);
     }
 
-    public User updateUser(Long id, User updatedUser) {
+    public UserResponse updateUser(Long id, RegisterRequest request) {
 
         User existingUser = userRepository.findById(id)
-            .orElse(null);
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (existingUser == null) {
-           return null;
-        }
+        existingUser.setUsername(request.getUsername());
+        existingUser.setEmail(request.getEmail());
+        existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        existingUser.setUsername(updatedUser.getUsername());
-        existingUser.setEmail(updatedUser.getEmail());
-        existingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
-
-        return userRepository.save(existingUser);
+        return mapToResponse(userRepository.save(existingUser));
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -59,7 +70,7 @@ public class UserService {
             .orElse(null);
 
         if (user == null) {
-            return new LoginResponse(null, "User not found");
+            return new LoginResponse(null, "Invalid credentials");
         }
 
         boolean matches = passwordEncoder.matches(
@@ -68,10 +79,17 @@ public class UserService {
         );
 
         if (!matches) {
-            return new LoginResponse(null, "Invalid password");
+            return new LoginResponse(null, "Invalid credentials");
         }
 
         String token = jwtUtil.generateToken(user.getEmail());
         return new LoginResponse(token, "Login successful");
+    }
+    private UserResponse mapToResponse(User user){
+        UserResponse response = new UserResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setEmail(user.getEmail());
+        return response;
     }
 }

@@ -1,30 +1,607 @@
 this files for me to understand whatever ive built and its workflow, so i can understand what ive built so far and i can also revise :))
 
-# How JWT Authentication Works in My Spring Boot Project lol 
 
-When a new user registers, the frontend sends their username, email, and password to the backend through an HTTP request. The controller receives the request, passes it to the service, and the service hashes the password using `BCryptPasswordEncoder` before saving the user in PostgreSQL through the repository. At this point, the user's account exists in the database, but they are **not logged in** yet.
+# How I Built and Understand My Spring Boot Backend Project
+# Understanding Spring Boot Project Architecture
 
-When the user logs in, the frontend sends the email and password to the login endpoint. The backend retrieves the user from the database using the email and compares the entered password with the hashed password stored in the database. If the credentials are correct, `JwtUtil` generates a JWT containing information such as the user's email and an expiration time. The backend sends this JWT back to the frontend.
+Initially, I had different files like controllers, services, repositories, entities, and DTOs, but I did not fully understand why they were separated.
 
-The frontend stores the JWT (for example, in localStorage or a secure cookie). From this point onward, whenever the user accesses a protected feature—such as viewing journals, creating a journal, editing one, or deleting one—the frontend automatically includes the JWT in the `Authorization` header of every HTTP request. The user does not need to log in again because the token is sent automatically with each request until it expires or the user logs out.
+I learned that each layer has a specific responsibility.
 
-When one of these protected requests reaches the backend, it first passes through the `JwtFilter`. The filter reads the JWT from the `Authorization` header and asks `JwtUtil` to verify that the token is valid and has not expired. If the token is valid, `JwtUtil` extracts the user's email from it. Using that email, the filter queries the database through `UserRepository` to retrieve the corresponding `User` object and confirm that the user still exists.
+The controller is the entry point of the application. It communicates with the frontend. It receives HTTP requests, extracts data from them, and sends the request to the service layer.
 
-At this point, the authenticated `User` object exists only inside the `JwtFilter` as a local variable. If nothing else is done, the controller and service classes have no way of knowing who the logged-in user is because local variables cannot be accessed outside the method in which they were created. To solve this, the filter creates a `UsernamePasswordAuthenticationToken`, which is Spring Security's representation of an authenticated user, and stores it in the `SecurityContext`. The `SecurityContext` is a temporary storage area that exists only for the current HTTP request. Once the authenticated user is stored there, any controller or service handling that request can retrieve the currently logged-in user without passing the user object through every method.
+The controller should not contain business logic. Its job is only to handle communication.
 
-Finally, the request reaches the controller and service. Since Spring Security already knows who the authenticated user is through the `SecurityContext`, the service can associate new journals with the correct user (for example, by calling `journal.setUser(currentUser)`) and ensure that users only access or modify their own data. After the request is completed and the response is sent back to the frontend, the `SecurityContext` is cleared. The next request repeats the same process: the frontend sends the JWT again, the filter validates it again, recreates the authenticated user in the `SecurityContext`, and the application continues securely without asking the user to log in again.
+The service layer contains the actual application logic. This is where decisions happen, such as encrypting passwords, creating journals, checking ownership, updating data, and converting objects.
 
-i first connected the User and Journal entities using a one-to-many / many-to-one relationship. Each Journal contains a User object using @ManyToOne, and the User entity contains a list of journals using @OneToMany(mappedBy = "user"). Because of this relationship, JPA automatically stores the owner's ID in the user_id foreign key column of the journals table without us manually setting a userId.
+The repository layer communicates with the database. Instead of manually writing SQL queries for every operation, Spring Data JPA allows repositories to interact with database tables using Java methods.
 
-When a logged-in user creates a new journal, the frontend sends only the journal information (such as the title and content). It does not send a userId, because the frontend should never decide who owns the data. Instead, the service retrieves the currently authenticated User from the SecurityContext
+The entity classes represent database tables. They define how objects are stored and how relationships between tables work.
 
-This associates the journal with the logged-in user before saving it. Since the Journal entity already contains a User field annotated with @ManyToOne, JPA automatically inserts the correct user_id into the database.
+The DTO layer controls what information enters and leaves the application.
 
-i also secured the read operations. Instead of returning every journal in the database using findAll(), using jpa. This ensures that when a user requests their journals, only journals belonging to the currently authenticated user are returned.
+Understanding this separation helped me realize that a backend is not one huge file. Each layer has a specific responsibility.
 
-Instead of simply finding a journal by its ID, the database now checks both the journal ID and the owner. This prevents users from accessing another user's journal simply by guessing its ID in the URL.
+---
 
-{{Every request is authenticated using JWT. The authenticated user is stored in Spring Security's SecurityContext. When fetching a journal, I query the database using both the journal ID and the authenticated user (findByIdAndUser). This ensures a user can only access journals they own. Additionally, I use DTOs to expose only the fields the frontend needs, hiding internal fields like user relationships.}}
+# Understanding Dependency Injection and Spring Beans
 
-//HOW DOES MY DTOS WORK (FUTURE REF)
-DTOs act as a middle layer between the frontend and backend entities. When the frontend sends data, it does not directly send a Journal entity; instead, it sends a JournalRequest DTO containing only the fields the user is allowed to provide, like title and content. The controller receives this DTO using @RequestBody, and the service converts it into a Journal entity by adding backend-controlled information like the logged-in user from the SecurityContext, createdAt, and other fields before saving it to the database. After saving, the database returns the Journal entity, but we do not directly send it back because it may contain internal information like the user object. Instead, the service converts the entity into a JournalResponse DTO containing only the data the frontend needs, such as id, title, content, and createdAt. The controller's parameter (JournalRequest) represents what enters the backend, while the return type (JournalResponse) represents what leaves the backend and is sent back to the frontend as JSON.
+One of my biggest questions while learning Spring Boot was:
+
+"Where are these objects actually created?"
+
+For example, UserService requires UserRepository. Normally in Java, I would create an object manually using the new keyword.
+
+However, Spring works differently.
+
+Spring creates and manages objects called beans.
+
+Classes marked with annotations like @Service, @Repository, and @Controller are automatically detected by Spring during application startup.
+
+Spring creates these objects and stores them inside its Application Context.
+
+When another class needs a dependency, Spring automatically provides that object.
+
+For example, UserService does not create UserRepository itself. Instead, it asks for UserRepository through constructor injection, and Spring provides it.
+
+The reason we use dependency injection is because classes do not need to know how their dependencies are created. They only need to know what they need.
+
+This makes the application easier to maintain, test, and modify.
+
+---
+
+# User Registration Flow
+
+When a new user registers, the frontend sends information such as username, email, and password.
+
+The request first reaches the UserController.
+
+Initially, I was returning User directly from the controller. Later, I understood that exposing entities directly is not a good practice because entities represent internal database structures.
+
+Instead, I introduced RegisterRequest and UserResponse DTOs.
+
+RegisterRequest represents data entering the backend.
+
+UserResponse represents data leaving the backend.
+
+The controller receives RegisterRequest because it contains only the information a user is allowed to provide.
+
+The controller passes this request to UserService.
+
+The service creates a new User entity from the RegisterRequest.
+
+The service then encrypts the password using BCryptPasswordEncoder.
+
+The password is never stored directly in the database.
+
+After encryption, the User entity is passed to UserRepository.
+
+The repository saves the user into PostgreSQL.
+
+At this point, the account exists, but the user is not logged in.
+
+Registration and authentication are two separate processes.
+
+Creating an account does not automatically mean the user is authenticated.
+
+---
+
+# Understanding Password Encryption with BCrypt
+
+Initially, I wondered:
+
+"If we need the password during login, why don't we just store it?"
+
+The reason is security.
+
+Passwords should never be stored as plain text.
+
+If someone gains access to the database, they should not be able to see everyone's passwords.
+
+BCrypt does not encrypt passwords because encryption can be reversed.
+
+Instead, it hashes passwords.
+
+During registration:
+
+The original password is converted into a hash.
+
+During login:
+
+The user enters their password again.
+
+BCrypt compares the entered password with the stored hash.
+
+If they match, authentication succeeds.
+
+The backend never needs to know the original password.
+
+---
+
+# Login Flow and JWT Creation
+
+Login works differently from registration.
+
+The frontend sends email and password using LoginRequest.
+
+The controller receives this request and sends it to UserService.
+
+The service searches for the user using the email.
+
+If the user does not exist, login fails.
+
+If the user exists, BCrypt compares the entered password with the stored encrypted password.
+
+If the password is correct, the service calls JwtUtil.
+
+JwtUtil creates a JWT token.
+
+The token contains information such as:
+
+The user's email.
+
+Expiration time.
+
+A signature to verify that the token has not been modified.
+
+The backend returns this token through LoginResponse.
+
+The frontend stores this token.
+
+Now the user is logged in.
+
+---
+
+# Understanding JWT Filter
+
+One of my biggest questions was:
+
+"Why do we need JwtFilter if JWT is already created during login?"
+
+The answer is that JwtFilter is not used during login.
+
+During login:
+
+Frontend sends credentials.
+
+Backend verifies them.
+
+JwtUtil creates a token.
+
+Token is returned.
+
+JwtFilter is used only after login.
+
+For example:
+
+The user wants to view journals.
+
+The frontend sends a request with the JWT inside the Authorization header.
+
+Before the request reaches the controller, it enters Spring Security's filter chain.
+
+The JwtFilter reads the token.
+
+It asks JwtUtil to validate:
+
+Is the signature correct?
+
+Has the token expired?
+
+Is the token valid?
+
+If the token is valid, JwtUtil extracts the user's email.
+
+The filter then uses UserRepository to retrieve the User from the database.
+
+Now the filter knows who is making the request.
+
+---
+
+# Why SecurityContext Exists
+
+At this point, the authenticated User object exists only inside JwtFilter.
+
+My confusion was:
+
+"How can the service know the logged-in user if the variable exists only inside the filter?"
+
+The answer is SecurityContext.
+
+A local variable inside a method cannot be accessed by other classes.
+
+So Spring Security provides SecurityContext as temporary storage for the current request.
+
+The JwtFilter creates a UsernamePasswordAuthenticationToken containing the authenticated user.
+
+It stores this object inside SecurityContext.
+
+Now controllers and services can access the authenticated user.
+
+For example, inside JournalService:
+
+The service asks SecurityContext:
+
+"Who is currently logged in?"
+
+SecurityContext returns the authenticated User.
+
+The service can now associate journals with that user.
+
+The SecurityContext exists only for the current incoming HTTP request.
+
+It is not used when sending responses.
+
+After the request finishes, it is cleared.
+
+When another request arrives, JWT validation happens again and SecurityContext is recreated.
+
+This is why JWT authentication is stateless.
+
+---
+
+# Connecting User and Journal Entities
+
+After authentication was working, I needed to connect users with their journals.
+
+The requirement was:
+
+One user can have many journals.
+
+One journal belongs to one user.
+
+This is a one-to-many relationship.
+
+The User entity contains a list of journals.
+
+The Journal entity contains a User object.
+
+The Journal side contains the foreign key because every journal needs to know its owner.
+
+JPA automatically creates a user_id column in the journals table.
+
+I do not manually create or send userId.
+
+The relationship handles it automatically.
+
+---
+
+# Why Frontend Should Never Send userId
+
+One important security lesson I learned was:
+
+The frontend should never decide ownership.
+
+A bad design would be:
+
+Frontend sends:
+
+"Create this journal and assign it to userId 5."
+
+The problem is that anyone could modify the request and send another user's ID.
+
+Instead, ownership is decided by the backend.
+
+When creating a journal:
+
+The frontend only sends title and content.
+
+The backend retrieves the authenticated user from SecurityContext.
+
+The backend sets:
+
+This journal belongs to this logged-in user.
+
+The database stores the relationship.
+
+This prevents users from creating data for other accounts.
+
+---
+
+# Protecting Journal Data
+
+Initially, a simple database query would be:
+
+Find journal by ID.
+
+However, this creates a security problem.
+
+Imagine:
+
+User A owns journal ID 10.
+
+User B guesses that ID and sends:
+
+GET /journals/10
+
+If the backend only checks the ID, User B can access User A's journal.
+
+To prevent this, I changed the query.
+
+Instead of:
+
+Find by ID.
+
+I use:
+
+Find by ID and User.
+
+The database checks two things:
+
+Does this journal exist?
+
+Does it belong to the currently authenticated user?
+
+Only then is the journal returned.
+
+The same idea applies to update and delete operations.
+
+A user can only modify resources they own.
+
+---
+
+# Understanding DTOs
+
+One of my biggest questions was:
+
+"If Spring already converts JSON into objects using @RequestBody, why do we need DTOs?"
+
+The answer is separation.
+
+Entities represent database structure.
+
+DTOs represent API communication.
+
+They have different purposes.
+
+For example:
+
+Journal entity contains:
+
+Journal information.
+
+User relationship.
+
+Database-specific information.
+
+But the frontend does not need all of that.
+
+So instead of sending the entity directly, I created:
+
+JournalRequest.
+
+JournalResponse.
+
+---
+
+# JournalRequest Flow
+
+When creating or updating a journal:
+
+Frontend sends:
+
+Title.
+
+Content.
+
+The controller receives JournalRequest using @RequestBody.
+
+The service converts this request into a Journal entity.
+
+The service adds information the frontend should never control:
+
+Authenticated user.
+
+Creation time.
+
+Other backend-controlled fields.
+
+Then the entity is saved.
+
+---
+
+# JournalResponse and mapToResponse()
+
+After saving, the repository returns a Journal entity.
+
+My next question was:
+
+"Why not directly return the entity?"
+
+The problem is that entities can contain internal information.
+
+For example:
+
+A Journal contains the User object.
+
+Returning it could expose unnecessary information.
+
+So I created mapToResponse().
+
+This method takes a Journal entity and creates a JournalResponse object.
+
+It copies only the required fields:
+
+ID.
+
+Title.
+
+Content.
+
+Created time.
+
+Then Spring converts JournalResponse into JSON and sends it to the frontend.
+
+So:
+
+JournalRequest = What enters the backend.
+
+Journal = Internal object used by backend and database.
+
+JournalResponse = What leaves the backend.
+
+---
+
+# Validation Using Bean Validation
+
+After creating APIs, I wanted to prevent invalid data.
+
+For example:
+
+A journal should not have an empty title.
+
+A password should not be too short.
+
+An email should have a valid format.
+
+Spring provides Bean Validation annotations.
+
+Examples:
+
+@NotBlank checks that a String is not null, empty, or only spaces.
+
+@Size checks length.
+
+@Email checks email format.
+
+However, these annotations do nothing by themselves.
+
+They only define rules.
+
+The controller needs @Valid.
+
+When @Valid is added:
+
+Spring checks the DTO before entering the controller method.
+
+If validation fails, Spring throws MethodArgumentNotValidException.
+
+---
+
+# Global Exception Handling
+
+Initially, I wondered:
+
+"When validation fails, where does the error go?"
+
+The answer is GlobalExceptionHandler.
+
+@ControllerAdvice tells Spring:
+
+"This class handles exceptions globally."
+
+Whenever an exception happens, Spring searches for a matching @ExceptionHandler method.
+
+For validation errors:
+
+MethodArgumentNotValidException occurs.
+
+Spring calls the corresponding handler.
+
+The handler collects all field errors and returns a clean JSON response.
+
+Instead of every controller writing error handling code, one global place manages errors.
+
+---
+
+# Custom ResourceNotFoundException
+
+For database operations, another common situation occurs.
+
+Example:
+
+User requests:
+
+GET /journals/1000
+
+But journal 1000 does not exist.
+
+Instead of returning null everywhere, I created a custom exception.
+
+ResourceNotFoundException represents:
+
+"The requested data does not exist."
+
+Inside the service, I use:
+
+orElseThrow()
+
+If data exists:
+
+Continue normally.
+
+If data does not exist:
+
+Throw ResourceNotFoundException.
+
+---
+
+# Understanding throw and throws
+
+I initially confused throw and throws.
+
+throw is used when I actually create and send an exception.
+
+Example:
+
+Throw a new ResourceNotFoundException.
+
+It immediately creates an exception object and sends it upward.
+
+throws is used in a method signature to tell Java:
+
+"This method may produce this exception."
+
+It does not create the exception.
+
+In this project, I mostly use throw because I want to actively create exceptions when something goes wrong.
+
+---
+
+# Final Understanding of My Project
+
+After building this project, I understand that the backend works as a complete system.
+
+A user registers.
+
+The password is encrypted.
+
+The user is stored in PostgreSQL.
+
+The user logs in.
+
+Credentials are verified.
+
+JWT is generated.
+
+The frontend stores the token.
+
+Every future request sends the token.
+
+JwtFilter validates the token.
+
+The authenticated user is stored in SecurityContext.
+
+The service retrieves that user.
+
+Database operations always check ownership.
+
+DTOs control what data enters and leaves.
+
+Validation protects the API from invalid input.
+
+Global exception handling creates clean error responses.
+
+The backend does not trust the frontend for security decisions.
+
+The backend decides:
+
+Who is logged in.
+
+What data they own.
+
+What they can access.
+
+What information they receive.
+
+

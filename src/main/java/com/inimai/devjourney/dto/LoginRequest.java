@@ -1,8 +1,13 @@
 package com.inimai.devjourney.dto;
 
-public class LoginRequest {
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
+public class LoginRequest {
+    @NotBlank(message = "email cannot be blank")
+    @Email(message = "email should be valid")
     private String email;
+    @NotBlank(message = "password cannot be blank")
     private String password;
 
     public LoginRequest() {

@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.inimai.devjourney.dto.RegisterRequest;
-import com.inimai.devjourney.entity.User;
+import com.inimai.devjourney.dto.UserResponse;
 import com.inimai.devjourney.service.UserService;
+
+import jakarta.validation.Valid;
 //it talks to frontend
 @RestController
 @RequestMapping("/users")//all urls starts with /users lol
@@ -27,29 +29,22 @@ public class UserController {
 
     @PostMapping
     //to create a new user, iuse @RequestBody to bind json to regreq
-    public User createUser(@RequestBody RegisterRequest request) {
-
-        User user = new User();
-
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
-
-        return userservice.saveUser(user);
+    public UserResponse createUser(@Valid @RequestBody RegisterRequest request) {
+        return userservice.saveUser(request);
     }
     @GetMapping
-    public List<User> getAllUsers() {
+    public List<UserResponse> getAllUsers() {
         return userservice.getAllUsers();
     }
     @GetMapping("/{id}")
     //to get user by id,i use @PathVariable to extract the id from the URL 
-    public User getUserById(@PathVariable Long id) {
+    public UserResponse getUserById(@PathVariable Long id) {
         return userservice.getUserById(id);
     }
     @PostMapping("/login")
     //LOGINRESPONSE is dto it goes back to frontend, it gets the values the backend gives
     //and requestbody loginreq is a dto in which the frontend communicates through to backend, it has json values
-    public LoginResponse login(@RequestBody LoginRequest request) {
+    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return userservice.login(request);
     } 
 }

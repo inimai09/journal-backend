@@ -1,9 +1,17 @@
 package com.inimai.devjourney.dto;
 
-public class RegisterRequest {
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
+public class RegisterRequest {
+    @NotBlank(message = "username cannot be blank")
     private String username;
+    @NotBlank(message = "email cannot be blank")
+    @Email(message = "email should be valid")
     private String email;
+    @NotBlank(message = "password cannot be blank")
+    @Size(min = 6, message = "password must be at least 6 characters long")
     private String password;
 
     public String getUsername() {

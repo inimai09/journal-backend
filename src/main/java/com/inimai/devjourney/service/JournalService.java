@@ -1,13 +1,18 @@
 package com.inimai.devjourney.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import com.inimai.devjourney.dto.JournalRequest;
+import com.inimai.devjourney.dto.JournalResponse;
 import com.inimai.devjourney.entity.Journal;
 import com.inimai.devjourney.entity.User;
+import com.inimai.devjourney.exception.ResourceNotFoundException;
 import com.inimai.devjourney.repository.JournalRepository;
 
 @Service
@@ -19,60 +24,112 @@ public class JournalService {
         this.journalRepository = journalRepository;
     }
 
-    public Journal saveJournal(Journal journal) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = (User) authentication.getPrincipal();
-        journal.setCreatedAt(LocalDateTime.now());
-        journal.setUser(user);
-        return journalRepository.save(journal);
-    }
-    //to understand authentication.whatever()
-    //Authentication
-    //Principal (Who?)
-   //Credentials (Password)
-   //Authorities (Roles)
-   //Authenticated? (true/false)
-    public Journal getJournalById(Long id) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = (User) authentication.getPrincipal();
-        return journalRepository.findByIdAndUser(id, user)
-                .orElse(null);
-    }
-    public List<Journal> getAllJournals() {
+
+    public JournalResponse saveJournal(JournalRequest request) {
 
         Authentication authentication =
                 SecurityContextHolder.getContext().getAuthentication();
 
         User user = (User) authentication.getPrincipal();
 
-        return journalRepository.findByUser(user);
+        Journal journal = new Journal();
+
+        journal.setTitle(request.getTitle());
+        journal.setContent(request.getContent());
+        journal.setCreatedAt(LocalDateTime.now());
+        journal.setUser(user);
+
+        return mapToResponse(journalRepository.save(journal));
     }
 
-    public Journal updateJournal(Long id, Journal journal) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+    public JournalResponse getJournalById(Long id) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
         User user = (User) authentication.getPrincipal();
-        Journal j = journalRepository.findByIdAndUser(id, user).orElse(null);
 
-        if(j == null){
-            return null;
+        Journal journal = journalRepository
+                .findByIdAndUser(id, user)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Journal not found"));
+
+        return mapToResponse(journal);
+    }
+
+
+    public List<JournalResponse> getAllJournals() {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        User user = (User) authentication.getPrincipal();
+
+        List<Journal> journals = journalRepository.findByUser(user);
+
+        List<JournalResponse> response = new ArrayList<>();
+
+        for (Journal journal : journals) {
+            response.add(mapToResponse(journal));
         }
-        j.setTitle(journal.getTitle());
-        j.setContent(journal.getContent());
-        return journalRepository.save(j);//exisiting journal obj is updated with new title and content
+
+        return response;
     }
+
+
+    public JournalResponse updateJournal(Long id, JournalRequest request) {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        User user = (User) authentication.getPrincipal();
+
+        Journal journal = journalRepository
+                .findByIdAndUser(id, user)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Journal not found"));
+
+        journal.setTitle(request.getTitle());
+        journal.setContent(request.getContent());
+
+        return mapToResponse(journalRepository.save(journal));
+    }
+    //to understand authentication.whatever()
+    //Authentication
+     //Principal (Who?)
+   //Credentials (Password)
+    //Authorities (Roles)
+    //Authenticated? (true/false)
+
+
     public String deleteJournal(Long id) {
-    Authentication authentication =
-            SecurityContextHolder.getContext().getAuthentication();
 
-    User user = (User) authentication.getPrincipal();
-    Journal j = journalRepository
-            .findByIdAndUser(id, user)
-            .orElse(null);
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
 
-    if (j == null) {
-        return "Journal not found";
+        User user = (User) authentication.getPrincipal();
+
+        Journal journal = journalRepository
+                .findByIdAndUser(id, user)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Journal not found"));
+
+        journalRepository.delete(journal);
+
+        return "Journal deleted successfully";
     }
-    journalRepository.delete(j);
-    return "Journal deleted successfully";
+
+    private JournalResponse mapToResponse(Journal journal) {
+//maptoresponse takes journal entity and converts it to journalresponse dto
+//spring converts to json and sends to frontend
+        JournalResponse response = new JournalResponse();
+
+        response.setId(journal.getId());
+        response.setTitle(journal.getTitle());
+        response.setContent(journal.getContent());
+        response.setCreatedAt(journal.getCreatedAt());
+
+        return response;
     }
 }
