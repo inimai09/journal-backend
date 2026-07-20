@@ -27,6 +27,10 @@ public class UserService {
     }
 
     public UserResponse saveUser(RegisterRequest request) {
+
+        if(userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email already exists");
+        }
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -50,18 +54,24 @@ public class UserService {
         
         return mapToResponse(user);
     }
-
+    /* 
     public UserResponse updateUser(Long id, RegisterRequest request) {
 
         User existingUser = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!existingUser.getEmail().equals(request.getEmail())) {
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new IllegalArgumentException("Email already exists");
+            }
+        }
 
         existingUser.setUsername(request.getUsername());
         existingUser.setEmail(request.getEmail());
         existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
 
         return mapToResponse(userRepository.save(existingUser));
-    }
+    }*/
 
     public LoginResponse login(LoginRequest request) {
 

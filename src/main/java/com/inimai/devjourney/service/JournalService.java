@@ -121,7 +121,7 @@ public class JournalService {
     }
 
     private JournalResponse mapToResponse(Journal journal) {
-//maptoresponse takes journal entity and converts it to journalresponse dto
+//maptoresponse takes journal entity and converts it to journalresponse dto outgoing
 //spring converts to json and sends to frontend
         JournalResponse response = new JournalResponse();
 

@@ -558,50 +558,158 @@ In this project, I mostly use throw because I want to actively create exceptions
 
 ---
 
-# Final Understanding of My Project
+Got it buddy. I'll convert those added sections into the same **humanized paragraph style** as your documentation instead of bullet points.
 
-After building this project, I understand that the backend works as a complete system.
+Add this after your existing documentation:
 
-A user registers.
+---
 
-The password is encrypted.
+# Understanding Spring IoC Container and ApplicationContext
 
-The user is stored in PostgreSQL.
+One of my biggest questions while learning Spring Boot was, "Where are all these objects actually created?" In normal Java programming, if one class needs another class, I would manually create the object using the `new` keyword. For example, I would create a `UserRepository` object and pass it into `UserService` myself. However, Spring works differently because it follows Inversion of Control (IoC). Instead of classes creating their own dependencies, Spring creates and manages these objects for us. These managed objects are called Beans.
 
-The user logs in.
+During application startup, Spring scans the application and detects classes annotated with `@Controller`, `@Service`, `@Repository`, and `@Component`. It creates objects of these classes and stores them inside the ApplicationContext. The ApplicationContext is Spring's IoC container, which acts as a storage area containing all Spring-managed objects. For example, objects like `UserController`, `UserService`, `UserRepository`, `JournalService`, `JwtUtil`, and `JwtFilter` are created and managed by Spring.
 
-Credentials are verified.
+When a class needs another object, it does not create it manually. Instead, it requests that dependency through constructor injection. For example, `UserService` requires `UserRepository`, so it declares it in its constructor. Spring checks the ApplicationContext, finds the `UserRepository` bean, and automatically provides it. This makes classes loosely coupled because they only know what dependency they need, not how that dependency is created. This improves maintainability, testing, and flexibility.
 
-JWT is generated.
+---
 
-The frontend stores the token.
+# Difference Between Bean Creation and Bean Validation
 
-Every future request sends the token.
+While learning validation, I initially confused Spring Beans with Bean Validation because both contain the word "Bean". However, they are completely different concepts.
 
-JwtFilter validates the token.
+A Spring Bean is an object managed by Spring's IoC container. These are created using annotations like `@Service`, `@Repository`, or manually using `@Bean`. For example, a `PasswordEncoder` object can be created as a Spring Bean using a configuration class.
 
-The authenticated user is stored in SecurityContext.
+Bean Validation is different. It is used to define rules for incoming data. Annotations like `@NotBlank`, `@Size`, and `@Email` do not create objects. They simply define conditions that data must satisfy. The validation happens when the controller uses `@Valid` before accepting a DTO.
 
-The service retrieves that user.
+For example, when a user sends a journal with an empty title, Spring checks the validation rules in `JournalRequest`. If the title violates the `@NotBlank` rule, Spring throws a `MethodArgumentNotValidException` before the controller method executes.
 
-Database operations always check ownership.
+---
 
-DTOs control what data enters and leaves.
+# Understanding Custom Exceptions and super(message)
 
-Validation protects the API from invalid input.
+While handling errors, I created a custom exception called `ResourceNotFoundException`. This represents cases where requested data does not exist. For example, if a user requests a journal with an ID that is not present in the database, instead of returning `null`, the service throws a custom exception.
 
-Global exception handling creates clean error responses.
+When writing the exception class, I used:
 
-The backend does not trust the frontend for security decisions.
+```java
+super(message);
+```
 
-The backend decides:
+At first, I wondered what this meant. Since `ResourceNotFoundException` extends `RuntimeException`, it inherits the features of the parent exception class. Calling `super(message)` sends the error message to the parent `RuntimeException` class so that Java's exception system can store and handle that message.
 
-Who is logged in.
+When we write:
 
-What data they own.
+```java
+throw new ResourceNotFoundException("Journal not found");
+```
 
-What they can access.
+we are creating a new exception object and immediately sending it upward. The exception moves back through the layers until Spring finds a class that knows how to handle it.
 
-What information they receive.
+---
 
+# How Exceptions Reach GlobalExceptionHandler
+
+When an exception is thrown inside the service layer, it does not directly go to the frontend. Spring catches the exception and checks whether there is a handler available for that type of exception.
+
+The flow is:
+
+The service throws `ResourceNotFoundException`.
+
+The exception moves upward because the service cannot handle it.
+
+Spring detects the exception.
+
+Spring checks classes marked with `@ControllerAdvice`.
+
+It searches for a method with a matching `@ExceptionHandler`.
+
+The matching handler executes and creates the response sent back to the frontend.
+
+This is why `@ControllerAdvice` works automatically. Spring manages this class and uses it whenever an exception occurs.
+
+---
+
+# Why Login Does Not Need mapToResponse()
+
+While working with DTOs, I initially wondered why we use `mapToResponse()` for users and journals but not for login.
+
+The reason is that login has a different purpose.
+
+During registration, the backend receives a `RegisterRequest` and creates a User entity. After saving, we return a `UserResponse` because the frontend may need user information.
+
+During login, the frontend only needs authentication information. The backend receives a `LoginRequest` containing email and password. After verification, the backend generates a JWT token and returns it using `LoginResponse`.
+
+The backend does not return the User entity during login because the frontend does not need the entire user object. It only needs the token that proves authentication.
+
+---
+
+# Why mapToResponse() Exists
+
+One of my biggest questions was:
+
+"If Spring already converts JSON into objects using `@RequestBody`, why do we need mapToResponse()?"
+
+The answer is that `@RequestBody` and `mapToResponse()` solve different problems.
+
+`@RequestBody` converts incoming JSON from the frontend into a Java object.
+
+For example:
+
+Frontend JSON:
+
+```json
+{
+"title":"My day",
+"content":"Learning Spring"
+}
+```
+
+becomes:
+
+```java
+
+```
+
+However, `mapToResponse()` is used when sending data back.
+
+Database entities contain internal information. For example, a Journal entity contains the User relationship because the database needs to know who owns the journal.
+
+If we directly return the Journal entity, Spring may expose unnecessary information such as the entire User object.
+
+Therefore, the flow becomes:
+
+Journal Entity → mapToResponse() → JournalResponse → JSON response
+
+The entity is used internally by the backend and database, while the response DTO controls what information leaves the application.
+
+---
+
+# Complete Protected Request Flow
+
+After login, every protected request follows a specific flow.
+
+The frontend sends a request with the JWT token inside the Authorization header.
+
+Before reaching the controller, the request enters Spring Security's filter chain.
+
+The JwtFilter reads the token and sends it to JwtUtil for validation.
+
+JwtUtil checks whether the signature is correct and whether the token has expired.
+
+If valid, the filter extracts the user's email from the token.
+
+The filter uses UserRepository to find the corresponding User from the database.
+
+The authenticated User object exists temporarily inside the filter, so the filter creates a `UsernamePasswordAuthenticationToken` and stores it inside SecurityContext.
+
+Now the controller and service can access the logged-in user.
+
+The service retrieves the user from SecurityContext and performs database operations only for that user.
+
+After the response is completed, SecurityContext is cleared.
+
+The next request repeats the same process because JWT authentication is stateless.
+
+---
 
